@@ -4,12 +4,15 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -18,7 +21,23 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ShieldFlix.apk
+      - name: Check APK
+        run: |
+          ls -la ShieldFlix.apk
+          unzip -l ShieldFlix.apk | grep -E "lib/.*\.so|classes.*\.dex"
+          # Shield dùng arm64: bắt buộc có thư viện torrent native cho arm64.
+          unzip -l ShieldFlix.apk | grep -q "lib/arm64-v8a/.*torrent.*\.so"
       - uses: actions/upload-artifact@v4
         with:
           name: ShieldFlix-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: ShieldFlix.apk
+      # Đăng bản mới nhất lên mục Releases để Shield tải thẳng bằng app Downloader:
+      # https://github.com/<tài khoản>/ShieldFlix/releases/latest/download/ShieldFlix.apk
+      - name: Publish release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" ShieldFlix.apk --title "ShieldFlix bản $TAG" --notes "Tự build từ commit ${{ github.sha }}" --latest
