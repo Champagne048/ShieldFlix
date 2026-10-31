@@ -35,5 +35,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ls -la out
-          gh release create "smoke-${{ github.run_number }}" out/* --prerelease --title "Smoke test ${{ github.run_number }}" --notes "Kết quả chạy thử trên máy ảo"
+          ls -la out || true
+          echo "::notice title=pid::start=$(cat out/pid-start.txt 2>/dev/null) end=$(cat out/pid-end.txt 2>/dev/null)"
+          echo "::notice title=crash::$(head -c 1500 out/crash.txt 2>/dev/null | tr '\n' ' ')"
+          zip -qr smoke-results.zip out
+          gh release create "smoke-${{ github.run_number }}" smoke-results.zip --prerelease --title "Smoke test ${{ github.run_number }}" --notes "Kết quả chạy thử trên máy ảo"
