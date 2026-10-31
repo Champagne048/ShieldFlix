@@ -18,6 +18,7 @@ key DPAD_CENTER; sleep 8; shot 05-detail-series
 key DPAD_DOWN DPAD_DOWN; sleep 4; shot 06-detail-episodes
 key BACK; sleep 4; shot 07-back-home
 key BACK; sleep 3; shot 08-back-to-top
+key BACK; shot 08b-exit-hint; sleep 3
 key DPAD_UP; sleep 2; shot 09-topbar
 key DPAD_LEFT DPAD_LEFT DPAD_LEFT DPAD_RIGHT DPAD_CENTER; sleep 3
 adb shell input text "dune"; sleep 8; key DPAD_DOWN; sleep 2; shot 10-search

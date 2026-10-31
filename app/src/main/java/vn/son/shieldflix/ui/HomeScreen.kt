@@ -2,6 +2,7 @@ package vn.son.shieldflix.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,6 +43,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -294,8 +298,30 @@ private fun RowsList(
         }
     }
 
-    BackHandler(enabled = activeRow > 0) { moveTo(0) }
+    // Như Netflix: Quay lại đưa về hàng đầu; ở hàng đầu thì phải bấm thêm lần nữa mới thoát app.
+    val activity = LocalContext.current as? Activity
+    var exitHintAt by remember { mutableLongStateOf(0L) }
+    BackHandler {
+        val now = System.currentTimeMillis()
+        when {
+            activeRow > 0 -> moveTo(0)
+            now - exitHintAt < 2500 -> activity?.finish()
+            else -> exitHintAt = now
+        }
+    }
+    if (exitHintAt > 0) {
+        LaunchedEffect(exitHintAt) { delay(2500); exitHintAt = 0L }
+    }
 
+    Box(Modifier.fillMaxSize()) {
+    if (exitHintAt > 0) {
+        Text(
+            "Bấm Quay lại lần nữa để thoát",
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp).zIndex(2f)
+                .clip(RoundedCornerShape(6.dp)).background(Color(0xE6202020)).padding(horizontal = 18.dp, vertical = 10.dp),
+            color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+        )
+    }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -341,6 +367,8 @@ private fun RowsList(
                 }
             }
         }
+    }
+
     }
 
     LaunchedEffect(Unit) {

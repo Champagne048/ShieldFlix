@@ -140,9 +140,9 @@ private fun DetailContent(nav: Nav, d: TitleDetail, progressAll: List<WatchProgr
 
         // Khi mở danh sách nguồn thì ẩn nội dung phía sau để remote không lạc focus ra ngoài.
         if (!showSources) Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 56.dp, top = 48.dp, bottom = 40.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 56.dp, top = 40.dp, bottom = 40.dp),
         ) {
-            TitleLogo(t.logo, t.name, modifier = Modifier.fillMaxWidth(0.4f), height = 128.dp, textSize = 46.sp)
+            TitleLogo(t.logo, t.name, modifier = Modifier.fillMaxWidth(0.36f), height = 100.dp, textSize = 42.sp)
             Spacer(Modifier.height(6.dp))
             if (t.originalName != t.name || t.logo != null) {
                 Text(if (t.originalName != t.name) "${t.name} · ${t.originalName}" else t.name, color = Palette.Gray, fontSize = 17.sp)
@@ -165,13 +165,13 @@ private fun DetailContent(nav: Nav, d: TitleDetail, progressAll: List<WatchProgr
             Spacer(Modifier.height(10.dp))
             Text(
                 t.overview, color = Color(0xFFE5E5E5), fontSize = 16.sp, lineHeight = 23.sp,
-                maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.55f),
+                maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.55f),
             )
             if (d.cast.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Diễn viên: " + d.cast.joinToString(", "), color = Palette.Gray, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(0.55f))
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(18.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 val label = when {
@@ -185,7 +185,7 @@ private fun DetailContent(nav: Nav, d: TitleDetail, progressAll: List<WatchProgr
             }
 
             if (isTv && d.seasons.isNotEmpty()) {
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(18.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 48.dp, top = 4.dp, bottom = 4.dp)) {
                     items(d.seasons, key = { it.number }) { s ->
                         TvChip("Mùa ${s.number}", selected = s.number == season, onClick = { season = s.number; selectedEp = 1 })
