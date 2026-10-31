@@ -97,7 +97,7 @@ fun SearchScreen(nav: Nav) {
             verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(results, key = { "${it.type}${it.id}" }) { t ->
+            items(results.distinctBy { it.key }, key = { it.key }) { t ->
                 PosterCard(t, onClick = { nav.push(Screen.Detail(t.type, t.id, t.imdbId)) }, width = 140.dp)
             }
         }

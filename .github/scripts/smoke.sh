@@ -5,6 +5,8 @@ shot() { adb exec-out screencap -p > "out/$1.png"; }
 key() { for k in "$@"; do adb shell input keyevent "KEYCODE_$k"; sleep 1.2; done; }
 adb install -r ShieldFlix.apk > out/install.txt 2>&1
 adb logcat -c
+# Máy ảo mặc định ở chế độ cảm ứng; bấm một phím để giống Shield (chỉ dùng remote).
+adb shell input keyevent KEYCODE_DPAD_DOWN
 adb shell am start -W -n vn.son.shieldflix/.MainActivity > out/start.txt 2>&1
 sleep 25
 shot 01-home

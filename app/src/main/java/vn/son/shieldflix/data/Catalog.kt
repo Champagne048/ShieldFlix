@@ -12,24 +12,28 @@ class Catalog(private val prefs: Prefs, private val tmdb: Tmdb, private val cine
     val sourceKey get() = if (prefs.hasTmdb) "tmdb:${prefs.tmdbKey}" else "cinemeta"
 
     suspend fun homeRows(): List<TitleRow> {
-        if (prefs.hasTmdb) {
+        val rows = if (prefs.hasTmdb) {
             try {
-                return tmdb.homeRows()
+                tmdb.homeRows()
             } catch (_: Exception) {
                 // Khoá sai hoặc TMDB lỗi: vẫn hiện phim từ Cinemeta.
+                cinemeta.homeRows()
             }
+        } else {
+            cinemeta.homeRows()
         }
-        return cinemeta.homeRows()
+        // Khoá danh sách phải duy nhất, nếu không danh sách cuộn của Compose sẽ lỗi.
+        return rows.map { it.copy(items = it.items.distinctBy { t -> t.key }) }.distinctBy { it.title }
     }
 
     suspend fun search(query: String): List<Title> {
         if (prefs.hasTmdb) {
             try {
-                return tmdb.search(query)
+                return tmdb.search(query).distinctBy { it.key }
             } catch (_: Exception) {
             }
         }
-        return cinemeta.search(query)
+        return cinemeta.search(query).distinctBy { it.key }
     }
 
     suspend fun detail(type: MediaType, tmdbId: Int, imdbId: String?): TitleDetail {

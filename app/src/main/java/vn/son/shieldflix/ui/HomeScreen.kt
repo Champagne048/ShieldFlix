@@ -279,7 +279,8 @@ private fun RowsList(
         if (r != activeRow) {
             activeRow = r
             // Hàng đang chọn luôn nằm ngay dưới phần giới thiệu phim.
-            scope.launch { listState.animateScrollToItem(r) }
+            // Chờ một nhịp để không bị thao tác cuộn tự động khi đổi focus cắt ngang.
+            scope.launch { delay(40); listState.animateScrollToItem(r) }
         }
     }
 
