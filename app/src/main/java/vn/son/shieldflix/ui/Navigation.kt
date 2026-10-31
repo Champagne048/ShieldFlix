@@ -21,7 +21,9 @@ sealed class Screen {
     data object Home : Screen() { override val key = "home" }
     data object Search : Screen() { override val key = "search" }
     data object Settings : Screen() { override val key = "settings" }
-    data class Detail(val type: MediaType, val id: Int) : Screen() { override val key = "detail:$type:$id" }
+    data class Detail(val type: MediaType, val id: Int, val imdbId: String? = null) : Screen() {
+        override val key = "detail:$type:$id:${imdbId ?: ""}"
+    }
     data class Player(val request: PlayRequest, val serial: Long = System.nanoTime()) : Screen() {
         override val key = "player:$serial"
     }
@@ -79,7 +81,7 @@ fun AppRoot() {
                 is Screen.Home -> HomeScreen(nav)
                 is Screen.Search -> SearchScreen(nav)
                 is Screen.Settings -> SettingsScreen(nav)
-                is Screen.Detail -> DetailScreen(nav, cur.type, cur.id)
+                is Screen.Detail -> DetailScreen(nav, cur.type, cur.id, cur.imdbId)
                 is Screen.Player -> PlayerScreen(nav, cur.request)
             }
         }

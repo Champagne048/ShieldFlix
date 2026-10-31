@@ -13,9 +13,17 @@ data class Title(
     val backdrop: String?,
     val year: String,
     val rating: Double,
-)
+    val imdbId: String? = null,
+    /** Ảnh logo tên phim (nền trong suốt), giống Netflix. */
+    val logo: String? = null,
+    val genres: List<String> = emptyList(),
+) {
+    val key get() = "$type:$id:${imdbId ?: ""}"
+}
 
-data class TitleRow(val title: String, val items: List<Title>)
+enum class RowStyle { TOP10, LANDSCAPE }
+
+data class TitleRow(val title: String, val items: List<Title>, val style: RowStyle = RowStyle.LANDSCAPE)
 
 data class SeasonInfo(val number: Int, val name: String, val episodeCount: Int)
 
@@ -37,6 +45,8 @@ data class TitleDetail(
     val tagline: String?,
     val seasons: List<SeasonInfo>,
     val certification: String?,
+    /** Danh sách tập lấy sẵn (nguồn Cinemeta); null thì tải theo mùa từ TMDB. */
+    val allEpisodes: List<Episode>? = null,
 )
 
 /** Một kết quả torrent từ nguồn Torznab. */
@@ -73,6 +83,7 @@ data class PlayRequest(
     val episodeName: String = "",
     val backdrop: String? = null,
     val poster: String? = null,
+    val logo: String? = null,
     /** Nguồn đã chọn sẵn; null thì tự tìm nguồn nhiều seed nhất. */
     val result: TorrentResult? = null,
     /** Magnet trực tiếp (dán từ điện thoại, mở từ app khác, hoặc tiếp tục xem). */

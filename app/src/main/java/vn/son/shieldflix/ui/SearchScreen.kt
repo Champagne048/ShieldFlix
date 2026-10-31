@@ -52,7 +52,7 @@ fun SearchScreen(nav: Nav) {
         loading = true
         error = null
         try {
-            results = app.tmdb.search(query)
+            results = app.catalog.search(query)
         } catch (e: Exception) {
             error = e.message
         }
@@ -98,7 +98,7 @@ fun SearchScreen(nav: Nav) {
             modifier = Modifier.fillMaxSize(),
         ) {
             items(results, key = { "${it.type}${it.id}" }) { t ->
-                PosterCard(t, onClick = { nav.push(Screen.Detail(t.type, t.id)) }, width = 140.dp)
+                PosterCard(t, onClick = { nav.push(Screen.Detail(t.type, t.id, t.imdbId)) }, width = 140.dp)
             }
         }
     }

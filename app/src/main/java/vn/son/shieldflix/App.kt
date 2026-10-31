@@ -2,6 +2,8 @@ package vn.son.shieldflix
 
 import android.app.Application
 import kotlinx.coroutines.channels.Channel
+import vn.son.shieldflix.data.Catalog
+import vn.son.shieldflix.data.Cinemeta
 import vn.son.shieldflix.data.Prefs
 import vn.son.shieldflix.data.SubtitleService
 import vn.son.shieldflix.data.Tmdb
@@ -16,6 +18,8 @@ class App : Application() {
     lateinit var prefs: Prefs
         private set
     lateinit var tmdb: Tmdb
+        private set
+    lateinit var catalog: Catalog
         private set
     lateinit var torznab: TorznabClient
         private set
@@ -36,6 +40,7 @@ class App : Application() {
         instance = this
         prefs = Prefs(this)
         tmdb = Tmdb(prefs)
+        catalog = Catalog(prefs, tmdb, Cinemeta())
         torznab = TorznabClient(prefs)
         subtitles = SubtitleService(prefs, cacheDir)
         engine = TorrentEngine(this)

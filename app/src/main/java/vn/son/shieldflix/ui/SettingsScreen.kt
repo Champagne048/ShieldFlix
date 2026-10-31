@@ -77,7 +77,7 @@ fun SettingsScreen(nav: Nav) {
                 Text("Trạng thái", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 if (version >= 0) {
-                    StatusLine("Thông tin phim (TMDB)", p.hasTmdb)
+                    StatusLine("Tiếng Việt cho tên phim (TMDB, không bắt buộc)", p.hasTmdb)
                     StatusLine("Nguồn torrent: ${p.torznabUrls.size} nguồn Torznab", p.hasSources)
                     StatusLine("Phụ đề Subdl", p.subdlKey.isNotBlank())
                     StatusLine("Phụ đề OpenSubtitles" + if (p.osUser.isNotBlank()) " (đã đăng nhập)" else "", p.osApiKey.isNotBlank())

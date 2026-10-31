@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,9 +60,9 @@ private val detailCache = HashMap<String, TitleDetail>()
 private val seasonCache = HashMap<String, List<Episode>>()
 
 @Composable
-fun DetailScreen(nav: Nav, type: MediaType, id: Int) {
+fun DetailScreen(nav: Nav, type: MediaType, id: Int, imdbId: String? = null) {
     val app = App.instance
-    val cacheKey = "$type:$id"
+    val cacheKey = "$type:$id:${imdbId ?: ""}:${app.catalog.sourceKey}"
     var detail by remember { mutableStateOf(detailCache[cacheKey]) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
@@ -71,7 +72,7 @@ fun DetailScreen(nav: Nav, type: MediaType, id: Int) {
     LaunchedEffect(cacheKey, reload) {
         if (detail != null) return@LaunchedEffect
         try {
-            detail = app.tmdb.detail(type, id).also { detailCache[cacheKey] = it }
+            detail = app.catalog.detail(type, id, imdbId).also { detailCache[cacheKey] = it }
         } catch (e: Exception) {
             error = e.message
         }
@@ -98,12 +99,12 @@ private fun DetailContent(nav: Nav, d: TitleDetail, progressAll: List<WatchProgr
     var showSources by remember { mutableStateOf(false) }
     val playFr = remember { FocusRequester() }
 
-    LaunchedEffect(t.id, season) {
+    LaunchedEffect(t.key, season) {
         if (!isTv) return@LaunchedEffect
-        val key = "${t.id}:$season"
+        val key = "${t.key}:$season"
         episodes = seasonCache[key]
         if (episodes == null) {
-            episodes = try { app.tmdb.season(t.id, season).also { seasonCache[key] = it } } catch (e: Exception) { emptyList() }
+            episodes = try { app.catalog.episodes(d, season).also { seasonCache[key] = it } } catch (e: Exception) { emptyList() }
         }
     }
 
@@ -113,7 +114,7 @@ private fun DetailContent(nav: Nav, d: TitleDetail, progressAll: List<WatchProgr
         return PlayRequest(
             tmdbId = t.id, type = t.type, title = t.name, originalTitle = t.originalName, year = t.year,
             imdbId = d.imdbId, season = if (isTv) s else 0, episode = if (isTv) ep else 0, episodeName = epName,
-            backdrop = t.backdrop, poster = t.poster, result = result,
+            backdrop = t.backdrop, poster = t.poster, logo = t.logo, result = result,
             // Tiếp tục xem: dùng lại đúng torrent đã xem dở (chỉ khi không chọn nguồn khác).
             magnet = if (result == null) prog?.magnet?.ifBlank { null } else null,
             startPositionMs = if (result == null) prog?.positionMs ?: 0 else 0,
@@ -127,25 +128,24 @@ private fun DetailContent(nav: Nav, d: TitleDetail, progressAll: List<WatchProgr
             model = Tmdb.img(t.backdrop, "w1280"),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            alignment = Alignment.TopCenter,
+            modifier = Modifier.align(Alignment.TopEnd).fillMaxWidth(0.78f).fillMaxHeight(),
         )
         Box(
             Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(0f to Palette.Bg, 0.45f to Palette.Bg.copy(alpha = 0.88f), 0.8f to Color.Transparent),
+                Brush.horizontalGradient(0f to Palette.Bg, 0.25f to Palette.Bg.copy(alpha = 0.95f), 0.5f to Palette.Bg.copy(alpha = 0.55f), 0.72f to Color.Transparent),
             ),
         )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Palette.Bg)))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x88000000), 0.15f to Color.Transparent, 0.55f to Color.Transparent, 1f to Palette.Bg)))
 
         // Khi mở danh sách nguồn thì ẩn nội dung phía sau để remote không lạc focus ra ngoài.
         if (!showSources) Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 56.dp, top = 44.dp, bottom = 40.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 56.dp, top = 48.dp, bottom = 40.dp),
         ) {
-            Text(
-                t.name, style = MaterialTheme.typography.displaySmall, fontSize = 44.sp, lineHeight = 50.sp,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.6f),
-            )
-            if (t.originalName != t.name) {
-                Text(t.originalName, color = Palette.Gray, fontSize = 17.sp)
+            TitleLogo(t.logo, t.name, modifier = Modifier.fillMaxWidth(0.4f), height = 128.dp, textSize = 46.sp)
+            Spacer(Modifier.height(6.dp))
+            if (t.originalName != t.name || t.logo != null) {
+                Text(if (t.originalName != t.name) "${t.name} · ${t.originalName}" else t.name, color = Palette.Gray, fontSize = 17.sp)
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -582,9 +582,9 @@ private fun Backdrop(req: PlayRequest) {
     Box(Modifier.fillMaxSize()) {
         AsyncImage(
             model = Tmdb.img(req.backdrop, "w1280"), contentDescription = null,
-            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(0.35f),
+            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(0.5f),
         )
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color.Black, 0.7f to Color.Transparent)))
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color.Black, 0.35f to Color(0xCC000000), 0.8f to Color.Transparent)))
     }
 }
 
@@ -593,8 +593,14 @@ private fun LoadingScreen(req: PlayRequest, phase: Phase, stats: TorrentStats, l
     Box(Modifier.fillMaxSize()) {
         Backdrop(req)
         Column(Modifier.align(Alignment.CenterStart).padding(start = 72.dp).fillMaxWidth(0.6f)) {
-            Text(req.displayTitle, style = MaterialTheme.typography.displaySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (req.episodeName.isNotBlank()) Text(req.episodeName, color = Palette.Gray, fontSize = 18.sp)
+            TitleLogo(req.logo, req.title, modifier = Modifier.fillMaxWidth(0.7f), height = 120.dp, textSize = 44.sp)
+            if (req.type == MediaType.TV && req.season > 0) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Mùa ${req.season} · Tập ${req.episode}" + if (req.episodeName.isNotBlank()) "  ·  ${req.episodeName}" else "",
+                    color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
             Spacer(Modifier.height(28.dp))
             val msg = when (phase) {
                 is Phase.Searching -> "Đang tìm nguồn nhiều người chia sẻ nhất…"

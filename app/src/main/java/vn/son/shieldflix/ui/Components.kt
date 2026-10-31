@@ -44,7 +44,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.TextUnit
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import vn.son.shieldflix.data.Tmdb
 import vn.son.shieldflix.data.Title
 import vn.son.shieldflix.data.WatchProgress
@@ -116,6 +121,101 @@ fun PosterCard(
     }
 }
 
+/** Logo tên phim (ảnh trong suốt như Netflix); không có hoặc lỗi thì hiện chữ to. */
+@Composable
+fun TitleLogo(
+    logo: String?,
+    name: String,
+    modifier: Modifier = Modifier,
+    height: Dp = 120.dp,
+    textSize: TextUnit = 46.sp,
+) {
+    var failed by remember(logo) { mutableStateOf(logo.isNullOrBlank()) }
+    if (failed) {
+        Text(
+            name, modifier = modifier,
+            style = androidx.compose.material3.MaterialTheme.typography.displaySmall,
+            fontSize = textSize, lineHeight = textSize * 1.1f, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
+    } else {
+        AsyncImage(
+            model = logo,
+            contentDescription = name,
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.BottomStart,
+            onState = { if (it is AsyncImagePainter.State.Error) failed = true },
+            modifier = modifier.height(height),
+        )
+    }
+}
+
+/** Thẻ ngang 16:9 kiểu Netflix: ảnh nền phim + logo tên phim. */
+@Composable
+fun LandscapeCard(
+    t: Title,
+    onClick: () -> Unit,
+    onFocus: () -> Unit = {},
+    width: Dp = 268.dp,
+    focusRequester: FocusRequester? = null,
+) {
+    FocusBox(
+        onClick = onClick, onFocus = onFocus, focusRequester = focusRequester,
+        shape = RoundedCornerShape(5.dp), focusedScale = 1.1f,
+        modifier = Modifier.width(width).aspectRatio(16f / 9f),
+    ) { focused ->
+        Box(Modifier.fillMaxSize().background(Palette.Card)) {
+            AsyncImage(
+                model = Tmdb.img(t.backdrop ?: t.poster, "w780"),
+                contentDescription = t.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color(0xCC000000))))
+            Box(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 10.dp).fillMaxWidth(0.62f)) {
+                TitleLogo(t.logo, t.name, height = 46.dp, textSize = 16.sp)
+            }
+            if (focused && t.rating > 0) {
+                Text(
+                    "★ %.1f".format(t.rating),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(3.dp))
+                        .background(Color(0xAA000000)).padding(horizontal = 6.dp, vertical = 2.dp),
+                    color = Palette.Green, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+/** Ô Top 10: số thứ tự lớn viền xám + poster dọc, giống hàng Top 10 của Netflix. */
+@Composable
+fun Top10Card(
+    rank: Int,
+    t: Title,
+    onClick: () -> Unit,
+    onFocus: () -> Unit = {},
+    focusRequester: FocusRequester? = null,
+) {
+    val numberStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Black, fontSize = 168.sp, letterSpacing = (-14).sp)
+    Box(Modifier.width(if (rank >= 10) 262.dp else 214.dp).height(194.dp)) {
+        Box(Modifier.align(Alignment.BottomStart).offset(y = 34.dp)) {
+            Text("$rank", style = numberStyle.copy(color = Palette.Bg))
+            Text("$rank", style = numberStyle.copy(color = Color(0xFF6E6E6E), drawStyle = Stroke(width = 6f)))
+        }
+        FocusBox(
+            onClick = onClick, onFocus = onFocus, focusRequester = focusRequester,
+            shape = RoundedCornerShape(4.dp), focusedScale = 1.08f,
+            modifier = Modifier.align(Alignment.BottomEnd).width(129.dp).aspectRatio(2f / 3f),
+        ) {
+            Box(Modifier.fillMaxSize().background(Palette.Card)) {
+                AsyncImage(
+                    model = Tmdb.img(t.poster, "w342"), contentDescription = t.name,
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+}
+
 /** Thẻ ngang "Tiếp tục xem" có thanh tiến độ đỏ. */
 @Composable
 fun ContinueCard(
@@ -126,7 +226,8 @@ fun ContinueCard(
 ) {
     FocusBox(
         onClick = onClick, onFocus = onFocus, focusRequester = focusRequester,
-        modifier = Modifier.width(260.dp).aspectRatio(16f / 9f),
+        shape = RoundedCornerShape(5.dp), focusedScale = 1.1f,
+        modifier = Modifier.width(268.dp).aspectRatio(16f / 9f),
     ) {
         Box(Modifier.fillMaxSize().background(Palette.Card)) {
             AsyncImage(

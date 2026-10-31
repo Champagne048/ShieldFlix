@@ -6,8 +6,11 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import vn.son.shieldflix.R
 
 object Palette {
     val Bg = Color(0xFF141414)
@@ -20,13 +23,22 @@ object Palette {
     val Overlay = Color(0xE6141414)
 }
 
+/** Inter: gần với Netflix Sans, đủ dấu tiếng Việt. */
+val Inter = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+    Font(R.font.inter_black, FontWeight.Black),
+)
+
 private val Typo = Typography(
-    displaySmall = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Black, color = Color.White),
-    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White),
-    titleMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White),
-    bodyLarge = TextStyle(fontSize = 16.sp, color = Color.White),
-    bodyMedium = TextStyle(fontSize = 14.sp, color = Palette.Gray),
-    labelLarge = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+    displaySmall = TextStyle(fontFamily = Inter, fontSize = 40.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = (-0.5).sp),
+    headlineSmall = TextStyle(fontFamily = Inter, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White),
+    titleMedium = TextStyle(fontFamily = Inter, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White),
+    bodyLarge = TextStyle(fontFamily = Inter, fontSize = 16.sp, color = Color.White),
+    bodyMedium = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = Palette.Gray),
+    labelLarge = TextStyle(fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
 )
 
 @Composable

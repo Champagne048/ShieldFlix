@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,20 +44,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import vn.son.shieldflix.App
 import vn.son.shieldflix.data.MediaType
 import vn.son.shieldflix.data.PlayRequest
+import vn.son.shieldflix.data.RowStyle
 import vn.son.shieldflix.data.Tmdb
 import vn.son.shieldflix.data.Title
 import vn.son.shieldflix.data.TitleRow
 import vn.son.shieldflix.data.WatchProgress
-import vn.son.shieldflix.web.ConfigServer
 
 /** Giữ dữ liệu trang chủ khi chuyển màn hình để quay lại không phải tải lại. */
 private object HomeCache {
     var key: String = ""
     var rows: List<TitleRow>? = null
-    var hero: Title? = null
+    var hero: HeroItem? = null
     var focusRow = 0
     var focusCol = 0
 }
@@ -67,81 +69,92 @@ private data class HeroItem(
     val overview: String,
     val backdrop: String?,
     val meta: String,
+    val logo: String?,
+    val title: Title? = null,
 )
 
 private fun Title.hero() = HeroItem(
     name, overview, backdrop,
     listOfNotNull(
+        if (rating > 0) "★ %.1f".format(rating) else null,
         year.ifBlank { null },
         if (type == MediaType.TV) "Series" else "Phim",
-        if (rating > 0) "★ %.1f".format(rating) else null,
-    ).joinToString("  ·  "),
+        genres.take(3).joinToString(" · ").ifBlank { null },
+    ).joinToString("   "),
+    logo,
+    this,
 )
 
 @Composable
 fun HomeScreen(nav: Nav) {
     val app = App.instance
     val version by app.prefs.version.collectAsState()
-    val tmdbKey = remember(version) { app.prefs.tmdbKey }
+    val sourceKey = remember(version) { app.catalog.sourceKey }
     val progress = remember(version) { app.prefs.progressList() }
+    val hasSources = remember(version) { app.prefs.hasSources }
 
-    var rows by remember { mutableStateOf(HomeCache.rows.takeIf { HomeCache.key == tmdbKey }) }
+    var rows by remember { mutableStateOf(HomeCache.rows.takeIf { HomeCache.key == sourceKey }) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
-    var focused by remember { mutableStateOf(HomeCache.hero?.hero()) }
+    var focused by remember { mutableStateOf(HomeCache.hero) }
     var hero by remember { mutableStateOf(focused) }
 
-    LaunchedEffect(tmdbKey, reload) {
-        if (tmdbKey.isBlank()) return@LaunchedEffect
-        if (rows != null && HomeCache.key == tmdbKey && reload == 0) return@LaunchedEffect
+    LaunchedEffect(sourceKey, reload) {
+        if (rows != null && HomeCache.key == sourceKey && reload == 0) return@LaunchedEffect
         error = null
         try {
-            val r = app.tmdb.homeRows()
+            val r = app.catalog.homeRows()
             rows = r
             HomeCache.rows = r
-            HomeCache.key = tmdbKey
+            HomeCache.key = sourceKey
             if (hero == null) hero = r.firstOrNull()?.items?.firstOrNull()?.hero()
         } catch (e: Exception) {
-            error = e.message ?: "Không tải được danh sách phim"
+            error = "Không tải được danh sách phim. Kiểm tra Shield đã có Internet chưa.\n(${e.message})"
         }
     }
 
     // Hero đổi theo ô đang chọn, chờ một nhịp để lướt nhanh không bị giật.
     LaunchedEffect(focused) {
-        delay(280)
-        if (focused != null) hero = focused
+        delay(300)
+        val f = focused ?: return@LaunchedEffect
+        hero = f
+        // Phim từ TMDB chưa có logo: lấy thêm để hero giống Netflix.
+        if (f.logo == null && f.title != null) {
+            val logo = app.catalog.logoFor(f.title)
+            if (logo != null && hero == f) hero = f.copy(logo = logo)
+        }
     }
 
     Box(Modifier.fillMaxSize().background(Palette.Bg)) {
-        // Ảnh nền hero
-        Crossfade(targetState = hero?.backdrop, animationSpec = tween(450), label = "hero") { bd ->
+        // Ảnh nền hero phủ gần hết màn hình, mờ dần sang trái và xuống dưới như Netflix.
+        Crossfade(targetState = hero?.backdrop, animationSpec = tween(500), label = "hero") { bd ->
             Box(Modifier.fillMaxSize()) {
                 if (bd != null) {
                     AsyncImage(
                         model = Tmdb.img(bd, "w1280"),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.align(Alignment.TopEnd).fillMaxWidth(0.72f).fillMaxHeight(0.72f),
+                        alignment = Alignment.TopCenter,
+                        modifier = Modifier.align(Alignment.TopEnd).fillMaxWidth(0.80f).fillMaxHeight(0.80f),
                     )
                 }
             }
         }
         Box(
             Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(0f to Palette.Bg, 0.35f to Palette.Bg.copy(alpha = 0.85f), 0.65f to Color.Transparent),
+                Brush.horizontalGradient(0f to Palette.Bg, 0.22f to Palette.Bg.copy(alpha = 0.92f), 0.42f to Palette.Bg.copy(alpha = 0.45f), 0.62f to Color.Transparent),
             ),
         )
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(0.35f to Color.Transparent, 0.62f to Palette.Bg),
+                Brush.verticalGradient(0f to Color(0x99000000), 0.14f to Color.Transparent, 0.45f to Color.Transparent, 0.74f to Palette.Bg),
             ),
         )
 
         Column(Modifier.fillMaxSize()) {
-            TopBar(nav, current = "home")
+            TopBar(nav, current = "home", showSetup = !hasSources)
 
             when {
-                tmdbKey.isBlank() -> Onboarding(nav)
                 error != null && rows == null -> ErrorView(error!!, onRetry = { reload++ })
                 rows == null -> LoadingView("Đang tải danh sách phim…")
                 else -> {
@@ -149,9 +162,12 @@ fun HomeScreen(nav: Nav) {
                     RowsList(
                         rows = rows!!,
                         progress = progress,
-                        onFocusTitle = { t -> focused = t.hero(); HomeCache.hero = t },
-                        onFocusProgress = { p -> focused = HeroItem(p.title, p.subtitle, p.backdrop, "Tiếp tục xem · ${vn.son.shieldflix.data.formatTime(p.positionMs)}") },
-                        onOpen = { t -> nav.push(Screen.Detail(t.type, t.id)) },
+                        onFocusTitle = { t -> val h = t.hero(); focused = h; HomeCache.hero = h },
+                        onFocusProgress = { p ->
+                            val h = HeroItem(p.title, p.subtitle, p.backdrop, "Tiếp tục xem · ${vn.son.shieldflix.data.formatTime(p.positionMs)}", null)
+                            focused = h; HomeCache.hero = h
+                        },
+                        onOpen = { t -> nav.push(Screen.Detail(t.type, t.id, t.imdbId)) },
                         onResume = { p -> nav.push(Screen.Player(resumeRequest(p))) },
                     )
                 }
@@ -168,45 +184,57 @@ fun resumeRequest(p: WatchProgress) = PlayRequest(
 )
 
 @Composable
-fun TopBar(nav: Nav, current: String) {
+fun TopBar(nav: Nav, current: String, showSetup: Boolean = false) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 22.dp),
+        Modifier.fillMaxWidth().height(64.dp).padding(start = 56.dp, end = 56.dp, top = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("SHIELDFLIX", color = Palette.Red, fontSize = 28.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.width(36.dp))
+        Text("SHIELDFLIX", color = Palette.Red, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp)
+        Spacer(Modifier.width(40.dp))
         NavTab("Trang chủ", current == "home") { if (current != "home") nav.goHome() }
         NavTab("Tìm kiếm", current == "search") { if (current != "search") nav.push(Screen.Search) }
         NavTab("Cài đặt", current == "settings") { if (current != "settings") nav.push(Screen.Settings) }
+        Spacer(Modifier.weight(1f))
+        if (showSetup) {
+            FocusBox(onClick = { nav.push(Screen.Settings) }, shape = RoundedCornerShape(4.dp), focusedScale = 1.05f, showBorder = false) { f ->
+                Text(
+                    "Thiết lập nguồn phim",
+                    modifier = Modifier.background(if (f) Color.White else Palette.Red).padding(horizontal = 14.dp, vertical = 7.dp),
+                    color = if (f) Color.Black else Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun NavTab(text: String, selected: Boolean, onClick: () -> Unit) {
     FocusBox(onClick = onClick, shape = RoundedCornerShape(4.dp), focusedScale = 1.05f, showBorder = false) { f ->
-        Text(
-            text,
-            modifier = Modifier.background(if (f) Color.White else Color.Transparent).padding(horizontal = 12.dp, vertical = 6.dp),
-            color = if (f) Color.Black else if (selected) Color.White else Palette.Gray,
-            fontSize = 17.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text,
+                modifier = Modifier.background(if (f) Color.White else Color.Transparent).padding(horizontal = 14.dp, vertical = 6.dp),
+                color = if (f) Color.Black else if (selected) Color.White else Color(0xFFCCCCCC),
+                fontSize = 17.sp,
+                fontWeight = if (selected || f) FontWeight.Bold else FontWeight.Medium,
+            )
+        }
     }
 }
 
 @Composable
 private fun HeroInfo(hero: HeroItem?) {
-    Column(Modifier.padding(start = 48.dp, top = 28.dp).fillMaxWidth(0.48f).height(196.dp)) {
+    Column(
+        Modifier.padding(start = 56.dp, top = 18.dp).fillMaxWidth(0.42f).height(214.dp),
+        verticalArrangement = Arrangement.Bottom,
+    ) {
         if (hero != null) {
-            Text(
-                hero.name, style = MaterialTheme.typography.displaySmall,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 44.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(hero.meta, color = Palette.Green, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            TitleLogo(hero.logo, hero.name, modifier = Modifier.fillMaxWidth(0.9f), height = 104.dp, textSize = 42.sp)
+            Spacer(Modifier.height(14.dp))
+            Text(hero.meta, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(8.dp))
             Text(
-                hero.overview, color = Color(0xFFDDDDDD), fontSize = 15.sp,
+                hero.overview, color = Color(0xFFE0E0E0), fontSize = 15.sp,
                 maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 21.sp,
             )
         }
@@ -223,31 +251,39 @@ private fun RowsList(
     onResume: (WatchProgress) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val restore = remember { FocusRequester() }
     val offset = if (progress.isNotEmpty()) 1 else 0
     // Hàng/cột cần trả focus về khi quay lại trang chủ.
     val targetRow = HomeCache.focusRow.coerceAtMost(rows.size - 1 + offset)
+    var activeRow by remember { mutableIntStateOf(targetRow) }
+
+    // Như Netflix: hàng đang chọn luôn nằm ngay dưới phần giới thiệu phim.
+    fun focusRow(r: Int) {
+        if (r != activeRow) {
+            activeRow = r
+            scope.launch { listState.animateScrollToItem(r) }
+        }
+    }
 
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 60.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 400.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (progress.isNotEmpty()) {
             item(key = "continue") {
                 RowBlock("Tiếp tục xem") {
-                    val rs = rememberLazyListState()
                     LazyRow(
-                        state = rs,
-                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = PaddingValues(horizontal = 56.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         itemsIndexed(progress, key = { _, p -> p.key }) { col, p ->
                             ContinueCard(
                                 p,
                                 onClick = { onResume(p) },
-                                onFocus = { HomeCache.focusRow = 0; HomeCache.focusCol = col; onFocusProgress(p) },
+                                onFocus = { HomeCache.focusRow = 0; HomeCache.focusCol = col; focusRow(0); onFocusProgress(p) },
                                 focusRequester = if (targetRow == 0 && col == HomeCache.focusCol.coerceAtMost(progress.size - 1)) restore else null,
                             )
                         }
@@ -258,19 +294,18 @@ private fun RowsList(
         itemsIndexed(rows, key = { _, r -> r.title }) { idx, row ->
             val rowIndex = idx + offset
             RowBlock(row.title) {
-                val rs = rememberLazyListState()
                 LazyRow(
-                    state = rs,
-                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 56.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 4.dp else 10.dp),
                 ) {
-                    itemsIndexed(row.items, key = { _, t -> "${t.type}${t.id}" }) { col, t ->
-                        PosterCard(
-                            t,
-                            onClick = { onOpen(t) },
-                            onFocus = { HomeCache.focusRow = rowIndex; HomeCache.focusCol = col; onFocusTitle(t) },
-                            focusRequester = if (rowIndex == targetRow && col == HomeCache.focusCol.coerceAtMost(row.items.size - 1)) restore else null,
-                        )
+                    itemsIndexed(row.items, key = { _, t -> t.key }) { col, t ->
+                        val fr = if (rowIndex == targetRow && col == HomeCache.focusCol.coerceAtMost(row.items.size - 1)) restore else null
+                        val onFocus = { HomeCache.focusRow = rowIndex; HomeCache.focusCol = col; focusRow(rowIndex); onFocusTitle(t) }
+                        if (row.style == RowStyle.TOP10) {
+                            Top10Card(col + 1, t, onClick = { onOpen(t) }, onFocus = onFocus, focusRequester = fr)
+                        } else {
+                            LandscapeCard(t, onClick = { onOpen(t) }, onFocus = onFocus, focusRequester = fr)
+                        }
                     }
                 }
             }
@@ -291,39 +326,7 @@ private fun RowsList(
 @Composable
 private fun RowBlock(title: String, content: @Composable () -> Unit) {
     Column {
-        Text(title, modifier = Modifier.padding(start = 52.dp), style = MaterialTheme.typography.headlineSmall, fontSize = 19.sp)
+        Text(title, modifier = Modifier.padding(start = 58.dp, top = 6.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE5E5E5))
         content()
     }
-}
-
-@Composable
-private fun Onboarding(nav: Nav) {
-    val app = App.instance
-    val ip = remember { ConfigServer.lanAddress() ?: "<IP Shield>" }
-    val fr = remember { FocusRequester() }
-    Column(Modifier.padding(start = 48.dp, top = 48.dp).fillMaxWidth(0.62f)) {
-        Text("Chào anh! Cần cài đặt một chút", style = MaterialTheme.typography.displaySmall, fontSize = 34.sp)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Mở trình duyệt trên điện thoại hoặc máy tính cùng mạng Wi-Fi, vào địa chỉ:",
-            color = Color(0xFFDDDDDD), fontSize = 18.sp,
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "http://$ip:${ConfigServer.PORT}",
-            color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0x33FFFFFF)).padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        Spacer(Modifier.height(10.dp))
-        Text("Mã PIN: ${app.prefs.pin}", color = Palette.Green, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Nhập khoá TMDB (bắt buộc, miễn phí), nguồn Torznab (Jackett/Prowlarr) và khoá phụ đề. " +
-                "Lưu xong, màn hình này tự tải danh sách phim.",
-            color = Palette.Gray, fontSize = 16.sp, lineHeight = 22.sp,
-        )
-        Spacer(Modifier.height(24.dp))
-        TvButton("Mở Cài đặt trên TV", { nav.push(Screen.Settings) }, primary = true, focusRequester = fr)
-    }
-    AutoFocus(fr)
 }

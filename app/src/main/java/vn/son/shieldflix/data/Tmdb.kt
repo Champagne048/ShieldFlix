@@ -82,7 +82,10 @@ class Tmdb(private val prefs: Prefs) {
                     TitleRow(s.label, emptyList())
                 }
             }
-        }.awaitAll().filter { it.items.isNotEmpty() }
+        }.awaitAll().filter { it.items.isNotEmpty() }.let { rows ->
+            val trending = rows.firstOrNull() ?: return@let rows
+            listOf(TitleRow("Top 10 tuần này", trending.items.take(10), RowStyle.TOP10)) + rows
+        }
     }
 
     suspend fun search(query: String): List<Title> {
@@ -111,6 +114,7 @@ class Tmdb(private val prefs: Prefs) {
             ?: o.optString("imdb_id").takeIf { it.startsWith("tt") }
         val runtime = if (type == MediaType.MOVIE) o.optInt("runtime").takeIf { it > 0 }
         else o.optJSONArray("episode_run_time")?.let { if (it.length() > 0) it.optInt(0) else null }
+        title = title.copy(imdbId = imdb, logo = imdb?.let { Cinemeta.logoUrl(it) }, genres = genres)
         val seasons = o.optJSONArray("seasons")?.let { a ->
             (0 until a.length()).map { a.getJSONObject(it) }
                 .filter { it.optInt("season_number") > 0 && it.optInt("episode_count") > 0 }
@@ -153,6 +157,17 @@ class Tmdb(private val prefs: Prefs) {
         }
     }
 
+    /** Logo tên phim (ưu tiên tiếng Việt, rồi tiếng Anh, rồi không chữ). */
+    suspend fun logo(type: MediaType, id: Int): String? {
+        val o = call("/${type.api}/$id/images", mapOf("include_image_language" to "vi,en,null", "language" to "vi-VN"))
+        val arr = o.optJSONArray("logos") ?: return null
+        val logos = (0 until arr.length()).map { arr.getJSONObject(it) }
+        val best = listOf("vi", "en", "").firstNotNullOfOrNull { lang ->
+            logos.firstOrNull { it.optString("iso_639_1").let { l -> if (lang.isEmpty()) l.isEmpty() || l == "null" else l == lang } }
+        } ?: logos.firstOrNull()
+        return best?.optString("file_path")?.takeIf { it.startsWith("/") }?.let { img(it, "w500") }
+    }
+
     suspend fun season(tvId: Int, season: Int): List<Episode> {
         val o = call("/tv/$tvId/season/$season")
         val arr = o.optJSONArray("episodes") ?: return emptyList()
@@ -169,7 +184,11 @@ class Tmdb(private val prefs: Prefs) {
     }
 
     companion object {
-        fun img(path: String?, size: String = "w500"): String? =
-            path?.let { "https://image.tmdb.org/t/p/$size$it" }
+        /** Đường dẫn TMDB ("/abc.jpg") thành URL ảnh; URL đầy đủ (Cinemeta) giữ nguyên. */
+        fun img(path: String?, size: String = "w500"): String? = when {
+            path.isNullOrBlank() -> null
+            path.startsWith("http") -> path
+            else -> "https://image.tmdb.org/t/p/$size$path"
+        }
     }
 }

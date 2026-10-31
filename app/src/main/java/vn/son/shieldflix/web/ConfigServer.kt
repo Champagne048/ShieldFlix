@@ -94,7 +94,7 @@ ${if (message != null) "<div class=msg>${esc(message)}</div>" else ""}
 </form>
 
 <form method="post" action="/save" class="card">
-<h2>Thông tin phim (bắt buộc)</h2>
+<h2>Tên và mô tả phim tiếng Việt (không bắt buộc)</h2>
 <p class="hint">Khoá TMDB miễn phí: đăng ký tại <a href="https://www.themoviedb.org/settings/api">themoviedb.org/settings/api</a>. Dán API Key (v3) hoặc Read Access Token.</p>
 <label>TMDB API key / token</label><input name="tmdb" value="${esc(p.tmdbKey)}">
 
