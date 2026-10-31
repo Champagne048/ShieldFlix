@@ -195,16 +195,16 @@ fun Top10Card(
     onFocus: () -> Unit = {},
     focusRequester: FocusRequester? = null,
 ) {
-    val numberStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Black, fontSize = 168.sp, letterSpacing = (-14).sp)
-    Box(Modifier.width(if (rank >= 10) 262.dp else 214.dp).height(194.dp)) {
-        Box(Modifier.align(Alignment.BottomStart).offset(y = 34.dp)) {
+    val numberStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Black, fontSize = 158.sp, letterSpacing = (-14).sp)
+    Box(Modifier.width(if (rank >= 10) 250.dp else 204.dp).height(180.dp)) {
+        Box(Modifier.align(Alignment.BottomStart).offset(y = 32.dp)) {
             Text("$rank", style = numberStyle.copy(color = Palette.Bg))
             Text("$rank", style = numberStyle.copy(color = Color(0xFF6E6E6E), drawStyle = Stroke(width = 6f)))
         }
         FocusBox(
             onClick = onClick, onFocus = onFocus, focusRequester = focusRequester,
             shape = RoundedCornerShape(4.dp), focusedScale = 1.08f,
-            modifier = Modifier.align(Alignment.BottomEnd).width(129.dp).aspectRatio(2f / 3f),
+            modifier = Modifier.align(Alignment.BottomEnd).width(120.dp).aspectRatio(2f / 3f),
         ) {
             Box(Modifier.fillMaxSize().background(Palette.Card)) {
                 AsyncImage(

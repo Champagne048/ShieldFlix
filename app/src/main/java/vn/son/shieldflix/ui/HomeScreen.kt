@@ -2,6 +2,7 @@ package vn.son.shieldflix.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +68,7 @@ private object HomeCache {
     var hero: HeroItem? = null
     var focusRow = 0
     var focusCol = 0
+    val rowCols = HashMap<Int, Int>()
 }
 
 /** Phần tử trên hero: phim/series hoặc mục "Tiếp tục xem". */
@@ -107,6 +115,7 @@ fun HomeScreen(nav: Nav) {
             rows = r
             HomeCache.rows = r
             HomeCache.key = sourceKey
+            HomeCache.rowCols.clear()
             if (hero == null) hero = r.firstOrNull()?.items?.firstOrNull()?.hero()
         } catch (e: Exception) {
             error = "Không tải được danh sách phim. Kiểm tra Shield đã có Internet chưa.\n(${e.message})"
@@ -225,7 +234,7 @@ private fun NavTab(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun HeroInfo(hero: HeroItem?) {
     Column(
-        Modifier.padding(start = 56.dp, top = 18.dp).fillMaxWidth(0.42f).height(214.dp),
+        Modifier.padding(start = 56.dp, top = 10.dp).fillMaxWidth(0.42f).height(206.dp),
         verticalArrangement = Arrangement.Bottom,
     ) {
         if (hero != null) {
@@ -252,30 +261,50 @@ private fun RowsList(
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val restore = remember { FocusRequester() }
     val offset = if (progress.isNotEmpty()) 1 else 0
-    // Hàng/cột cần trả focus về khi quay lại trang chủ.
-    val targetRow = HomeCache.focusRow.coerceAtMost(rows.size - 1 + offset)
+    val rowCount = rows.size + offset
+    // Mỗi hàng nhớ cột đang chọn (giống Netflix); focus vào hàng là về đúng cột đó.
+    val entries = remember(rowCount) { List(rowCount) { FocusRequester() } }
+    val targetRow = HomeCache.focusRow.coerceIn(0, maxOf(0, rowCount - 1))
     var activeRow by remember { mutableIntStateOf(targetRow) }
+    var gotFocus by remember { mutableStateOf(false) }
 
-    // Như Netflix: hàng đang chọn luôn nằm ngay dưới phần giới thiệu phim.
-    fun focusRow(r: Int) {
+    fun colOf(r: Int) = HomeCache.rowCols[r] ?: 0
+
+    fun onItemFocus(r: Int, col: Int) {
+        gotFocus = true
+        HomeCache.focusRow = r
+        HomeCache.focusCol = col
+        HomeCache.rowCols[r] = col
         if (r != activeRow) {
             activeRow = r
+            // Hàng đang chọn luôn nằm ngay dưới phần giới thiệu phim.
             scope.launch { listState.animateScrollToItem(r) }
         }
     }
+
+    // Lên/xuống giữa các hàng tự xử lý: hàng kế tiếp có thể chưa hiện trên màn hình.
+    fun moveTo(r: Int) {
+        if (r !in 0 until rowCount) return
+        scope.launch {
+            if (listState.layoutInfo.visibleItemsInfo.none { it.index == r }) listState.scrollToItem(r)
+            withFrameNanos { }
+            try { entries[r].requestFocus() } catch (_: Exception) {}
+        }
+    }
+
+    BackHandler(enabled = activeRow > 0) { moveTo(0) }
 
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 400.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (progress.isNotEmpty()) {
             item(key = "continue") {
-                RowBlock("Tiếp tục xem") {
+                RowBlock("Tiếp tục xem", 0, rowCount, ::moveTo) {
                     LazyRow(
+                        state = rememberLazyListState(initialFirstVisibleItemIndex = maxOf(0, colOf(0) - 1)),
                         contentPadding = PaddingValues(horizontal = 56.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -283,8 +312,8 @@ private fun RowsList(
                             ContinueCard(
                                 p,
                                 onClick = { onResume(p) },
-                                onFocus = { HomeCache.focusRow = 0; HomeCache.focusCol = col; focusRow(0); onFocusProgress(p) },
-                                focusRequester = if (targetRow == 0 && col == HomeCache.focusCol.coerceAtMost(progress.size - 1)) restore else null,
+                                onFocus = { onItemFocus(0, col); onFocusProgress(p) },
+                                focusRequester = if (col == colOf(0).coerceAtMost(progress.size - 1)) entries[0] else null,
                             )
                         }
                     }
@@ -292,15 +321,16 @@ private fun RowsList(
             }
         }
         itemsIndexed(rows, key = { _, r -> r.title }) { idx, row ->
-            val rowIndex = idx + offset
-            RowBlock(row.title) {
+            val r = idx + offset
+            RowBlock(row.title, r, rowCount, ::moveTo) {
                 LazyRow(
+                    state = rememberLazyListState(initialFirstVisibleItemIndex = maxOf(0, colOf(r) - 1)),
                     contentPadding = PaddingValues(horizontal = 56.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 4.dp else 10.dp),
                 ) {
                     itemsIndexed(row.items, key = { _, t -> t.key }) { col, t ->
-                        val fr = if (rowIndex == targetRow && col == HomeCache.focusCol.coerceAtMost(row.items.size - 1)) restore else null
-                        val onFocus = { HomeCache.focusRow = rowIndex; HomeCache.focusCol = col; focusRow(rowIndex); onFocusTitle(t) }
+                        val fr = if (col == colOf(r).coerceAtMost(row.items.size - 1)) entries[r] else null
+                        val onFocus = { onItemFocus(r, col); onFocusTitle(t) }
                         if (row.style == RowStyle.TOP10) {
                             Top10Card(col + 1, t, onClick = { onOpen(t) }, onFocus = onFocus, focusRequester = fr)
                         } else {
@@ -313,19 +343,29 @@ private fun RowsList(
     }
 
     LaunchedEffect(Unit) {
-        // Cuộn tới hàng đã chọn trước đó rồi đặt focus lại.
+        // Đặt focus về hàng/cột cũ. Lúc app vừa mở, cửa sổ có thể chưa sẵn sàng nên thử lại tới khi được (tối đa ~4 giây).
         if (targetRow > 0) listState.scrollToItem(targetRow)
-        // requestFocus() không báo lỗi khi item chưa gắn vào cây giao diện, nên thử vài lần trong ~0,5 giây.
-        for (wait in longArrayOf(60, 150, 300)) {
-            delay(wait)
-            try { restore.requestFocus() } catch (_: Exception) {}
+        repeat(20) {
+            if (gotFocus) return@LaunchedEffect
+            delay(if (it == 0) 60 else 200)
+            try { entries[targetRow].requestFocus() } catch (_: Exception) {}
         }
     }
 }
 
 @Composable
-private fun RowBlock(title: String, content: @Composable () -> Unit) {
-    Column {
+private fun RowBlock(title: String, row: Int, rowCount: Int, moveTo: (Int) -> Unit, content: @Composable () -> Unit) {
+    Column(
+        Modifier.onPreviewKeyEvent { e ->
+            if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (e.key) {
+                Key.DirectionDown -> { if (row + 1 < rowCount) moveTo(row + 1); true }
+                // Hàng đầu: để remote đi lên thanh menu như bình thường.
+                Key.DirectionUp -> if (row == 0) false else { moveTo(row - 1); true }
+                else -> false
+            }
+        },
+    ) {
         Text(title, modifier = Modifier.padding(start = 58.dp, top = 6.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE5E5E5))
         content()
     }

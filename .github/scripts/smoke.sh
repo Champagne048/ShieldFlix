@@ -11,16 +11,15 @@ shot 01-home
 adb shell pidof vn.son.shieldflix > out/pid-start.txt 2>&1 || echo DEAD > out/pid-start.txt
 key DPAD_RIGHT DPAD_RIGHT; sleep 3; shot 02-top10-right
 key DPAD_DOWN; sleep 4; shot 03-row-movies
-key DPAD_DOWN DPAD_RIGHT; sleep 4; shot 04-row-series
+key DPAD_DOWN; sleep 4; shot 04-row-series
 key DPAD_CENTER; sleep 8; shot 05-detail-series
 key DPAD_DOWN DPAD_DOWN; sleep 4; shot 06-detail-episodes
-key BACK; sleep 3; shot 07-back-home
-key DPAD_UP; sleep 2; key DPAD_CENTER; sleep 8; shot 08-detail-movie
-key BACK; sleep 2
-key DPAD_UP DPAD_UP DPAD_UP DPAD_UP; sleep 2; shot 09-topbar
-key DPAD_RIGHT DPAD_CENTER; sleep 3
-adb shell input text "dune"; sleep 8; shot 10-search
-key BACK BACK; sleep 2
+key BACK; sleep 4; shot 07-back-home
+key BACK; sleep 3; shot 08-back-to-top
+key DPAD_UP; sleep 2; shot 09-topbar
+key DPAD_LEFT DPAD_LEFT DPAD_LEFT DPAD_RIGHT DPAD_CENTER; sleep 3
+adb shell input text "dune"; sleep 8; key DPAD_DOWN; sleep 2; shot 10-search
+key BACK BACK BACK; sleep 2
 MAG='magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A6969'
 adb shell "am start -a android.intent.action.VIEW -d '$MAG'" > out/magnet.txt 2>&1
 sleep 12; shot 11-loading
