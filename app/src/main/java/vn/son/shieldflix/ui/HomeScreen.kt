@@ -110,6 +110,7 @@ fun HomeScreen(nav: Nav) {
     var reload by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(HomeCache.hero) }
     var hero by remember { mutableStateOf(focused) }
+    val homeTabFr = remember { FocusRequester() }
 
     LaunchedEffect(sourceKey, reload) {
         if (rows != null && HomeCache.key == sourceKey && reload == 0) return@LaunchedEffect
@@ -165,13 +166,14 @@ fun HomeScreen(nav: Nav) {
         )
 
         Column(Modifier.fillMaxSize()) {
-            TopBar(nav, current = "home", showSetup = !hasSources)
+            TopBar(nav, current = "home", showSetup = !hasSources, homeTabFr = homeTabFr)
+            if (!hasSources) SetupHint()
 
             when {
                 error != null && rows == null -> ErrorView(error!!, onRetry = { reload++ })
                 rows == null -> LoadingView("Đang tải danh sách phim…")
                 else -> {
-                    HeroInfo(hero)
+                    HeroInfo(hero, compact = !hasSources)
                     RowsList(
                         rows = rows!!,
                         progress = progress,
@@ -182,6 +184,7 @@ fun HomeScreen(nav: Nav) {
                         },
                         onOpen = { t -> nav.push(Screen.Detail(t.type, t.id, t.imdbId)) },
                         onResume = { p -> nav.push(Screen.Player(resumeRequest(p))) },
+                        onBackToMenu = { try { homeTabFr.requestFocus() } catch (_: Exception) {} },
                     )
                 }
             }
@@ -197,14 +200,14 @@ fun resumeRequest(p: WatchProgress) = PlayRequest(
 )
 
 @Composable
-fun TopBar(nav: Nav, current: String, showSetup: Boolean = false) {
+fun TopBar(nav: Nav, current: String, showSetup: Boolean = false, homeTabFr: FocusRequester? = null) {
     Row(
-        Modifier.fillMaxWidth().height(64.dp).padding(start = 56.dp, end = 56.dp, top = 14.dp),
+        Modifier.fillMaxWidth().height(80.dp).padding(start = 64.dp, end = 64.dp, top = 30.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("SHIELDFLIX", color = Palette.Red, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp)
         Spacer(Modifier.width(40.dp))
-        NavTab("Trang chủ", current == "home") { if (current != "home") nav.goHome() }
+        NavTab("Trang chủ", current == "home", homeTabFr) { if (current != "home") nav.goHome() }
         NavTab("Tìm kiếm", current == "search") { if (current != "search") nav.push(Screen.Search) }
         NavTab("Cài đặt", current == "settings") { if (current != "settings") nav.push(Screen.Settings) }
         Spacer(Modifier.weight(1f))
@@ -221,8 +224,8 @@ fun TopBar(nav: Nav, current: String, showSetup: Boolean = false) {
 }
 
 @Composable
-private fun NavTab(text: String, selected: Boolean, onClick: () -> Unit) {
-    FocusBox(onClick = onClick, shape = RoundedCornerShape(4.dp), focusedScale = 1.05f, showBorder = false) { f ->
+private fun NavTab(text: String, selected: Boolean, fr: FocusRequester? = null, onClick: () -> Unit) {
+    FocusBox(onClick = onClick, focusRequester = fr, shape = RoundedCornerShape(4.dp), focusedScale = 1.05f, showBorder = false) { f ->
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text,
@@ -236,9 +239,9 @@ private fun NavTab(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HeroInfo(hero: HeroItem?) {
+private fun HeroInfo(hero: HeroItem?, compact: Boolean = false) {
     Column(
-        Modifier.padding(start = 56.dp, top = 10.dp).fillMaxWidth(0.42f).height(206.dp),
+        Modifier.padding(start = 64.dp, top = 4.dp).fillMaxWidth(0.42f).height(if (compact) 150.dp else 190.dp),
         verticalArrangement = Arrangement.Bottom,
     ) {
         if (hero != null) {
@@ -262,6 +265,7 @@ private fun RowsList(
     onFocusProgress: (WatchProgress) -> Unit,
     onOpen: (Title) -> Unit,
     onResume: (WatchProgress) -> Unit,
+    onBackToMenu: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -306,7 +310,8 @@ private fun RowsList(
         when {
             activeRow > 0 -> moveTo(0)
             now - exitHintAt < 2500 -> activity?.finish()
-            else -> exitHintAt = now
+            // Lần bấm đầu ở hàng trên cùng: đưa lên thanh menu (Trang chủ · Tìm kiếm · Cài đặt).
+            else -> { exitHintAt = now; onBackToMenu() }
         }
     }
     if (exitHintAt > 0) {
@@ -316,7 +321,7 @@ private fun RowsList(
     Box(Modifier.fillMaxSize()) {
     if (exitHintAt > 0) {
         Text(
-            "Bấm Quay lại lần nữa để thoát",
+            "Đang ở thanh menu · Bấm Quay lại lần nữa để thoát",
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp).zIndex(2f)
                 .clip(RoundedCornerShape(6.dp)).background(Color(0xE6202020)).padding(horizontal = 18.dp, vertical = 10.dp),
             color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
@@ -332,7 +337,7 @@ private fun RowsList(
                 RowBlock("Tiếp tục xem", 0, rowCount, ::moveTo) {
                     LazyRow(
                         state = rememberLazyListState(initialFirstVisibleItemIndex = maxOf(0, colOf(0) - 1)),
-                        contentPadding = PaddingValues(horizontal = 56.dp, vertical = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 64.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         itemsIndexed(progress, key = { _, p -> p.key }) { col, p ->
@@ -352,7 +357,7 @@ private fun RowsList(
             RowBlock(row.title, r, rowCount, ::moveTo) {
                 LazyRow(
                     state = rememberLazyListState(initialFirstVisibleItemIndex = maxOf(0, colOf(r) - 1)),
-                    contentPadding = PaddingValues(horizontal = 56.dp, vertical = 14.dp),
+                    contentPadding = PaddingValues(horizontal = 64.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 4.dp else 10.dp),
                 ) {
                     itemsIndexed(row.items, key = { _, t -> t.key }) { col, t ->
@@ -395,7 +400,20 @@ private fun RowBlock(title: String, row: Int, rowCount: Int, moveTo: (Int) -> Un
             }
         },
     ) {
-        Text(title, modifier = Modifier.padding(start = 58.dp, top = 6.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE5E5E5))
+        Text(title, modifier = Modifier.padding(start = 66.dp, top = 6.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE5E5E5))
         content()
     }
+}
+
+/** Dòng nhắc cấu hình hiện thẳng trên trang chủ: không cần tìm vào Cài đặt mới thấy địa chỉ và mã PIN. */
+@Composable
+private fun SetupHint() {
+    val app = App.instance
+    val ip = remember { vn.son.shieldflix.web.ConfigServer.lanAddress() ?: "IP Shield" }
+    Text(
+        "Chưa có nguồn phim · Trên điện thoại mở  http://$ip:${vn.son.shieldflix.web.ConfigServer.PORT}  ·  Mã PIN ${app.prefs.pin}",
+        modifier = Modifier.padding(start = 64.dp, top = 2.dp).clip(RoundedCornerShape(4.dp))
+            .background(Palette.Red).padding(horizontal = 12.dp, vertical = 6.dp),
+        color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+    )
 }
