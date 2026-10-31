@@ -302,8 +302,11 @@ class ActiveTorrent(
     /** Chặn luồng đọc tới khi có piece [p]. Trả false nếu luồng bị huỷ. */
     fun waitForPiece(p: Int, cancelled: () -> Boolean): Boolean {
         val started = System.currentTimeMillis()
-        while (!handle.havePiece(p)) {
+        while (true) {
             if (closed || cancelled()) return false
+            // Handle có thể vừa bị gỡ khi người xem thoát: coi như luồng đã đóng thay vì ném lỗi native.
+            val have = try { handle.isValid && handle.havePiece(p) } catch (_: Exception) { return false }
+            if (have) break
             if (System.currentTimeMillis() - started > 10 * 60_000) return false
             Thread.sleep(40)
         }
